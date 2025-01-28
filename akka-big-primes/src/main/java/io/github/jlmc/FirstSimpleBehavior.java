@@ -1,5 +1,6 @@
 package io.github.jlmc;
 
+import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
@@ -20,16 +21,36 @@ public class FirstSimpleBehavior extends AbstractBehavior<String> {
     @Override
     public Receive<String> createReceive() {
         // 1. receive the message and response
-        var m =
-                newReceiveBuilder()
-                        .onAnyMessage(message -> processText(message))
-                        .build();
+        return newReceiveBuilder()
+                .onMessageEquals("Ping", this::pingHandler)
+                .onMessageEquals("create-child", this::createNewChildHandler)
+                .onAnyMessage(this::processText)
+                .build();
+    }
 
-        return m;
+    private Behavior<String> createNewChildHandler() {
+
+
+        ActorContext<String> context = super.getContext();
+
+        System.out.println("My path is " + getContext().getSelf().path() + " I going to create a child");
+
+
+        Behavior<String> child = createFirstSimpleBehavior();
+        ActorRef<String> child1 = context.spawn(child, "child-1");
+
+        child1.tell("Who are you?");
+
+        return this;
+    }
+
+    private Behavior<String> pingHandler() {
+        System.out.println("My path is " + getContext().getSelf().path() + " => ACK, Yes I'm here...");
+        return this;
     }
 
     private Behavior<String> processText(String text) {
-        System.out.println("I receive the Text: " + text);
+        System.out.println("My path is " + getContext().getSelf().path() + " and I received the text: " + text);
 
         return this;
     }
