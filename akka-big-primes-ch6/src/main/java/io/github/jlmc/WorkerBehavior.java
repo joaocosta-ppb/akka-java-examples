@@ -17,12 +17,15 @@ import java.util.concurrent.ThreadLocalRandom;
 public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
     private static final Logger LOGGER = LoggerFactory.getLogger(WorkerBehavior.class);
 
-    private BigInteger calculatedNumber;
+    //private BigInteger calculatedNumber;
 
     /**
      * The command must implement serializable, for cluster reasons.
      */
-    public record Command(String message, ActorRef<ManagerBehavior.Command> sender) implements Serializable {
+    public interface Command extends Serializable {
+    }
+
+    public record CalculatePrimeCommand(ActorRef<ManagerBehavior.Command> sender) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }
@@ -38,26 +41,31 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
 
     @Override
     public Receive<Command> createReceive() {
-        LOGGER.info("Creating worker receive");
-        String path = getContext().getSelf().path().toString();
+        return commandReceiveWhenThereIsNoCalculatedPrimeNumber();
+    }
+
+    private Receive<Command> commandReceiveWhenThereIsNoCalculatedPrimeNumber() {
         return newReceiveBuilder()
-                .onAnyMessage(command -> {
-                    if (Messages.START.equals(command.message)) {
-                        if (calculatedNumber == null) {
-                            calculatedNumber = new BigInteger(2000, ThreadLocalRandom.current());
-                            //System.out.println(bigInteger.nextProbablePrime());
-
-                        }
-                        command.sender().tell(new ManagerBehavior.ResultCommand(calculatedNumber, path));
-                    }
-
-                    return this;
+                .onMessage(CalculatePrimeCommand.class, command -> {
+                    BigInteger  randomNumber = new BigInteger(2000, ThreadLocalRandom.current());
+                    BigInteger prime = randomNumber.nextProbablePrime();
+                    command.sender().tell(new ManagerBehavior.ResultCommand(prime, getContext().getSelf().path().toString()));
+                    //return Behaviors.same();
+                    return createReceiveWhenAlreadyHaveCalculatedPrimeNumber(prime);
                 })
-                //.onMessageEquals(Messages.START, this::startHandler)
                 .onAnyMessage(this::fullbackHandler)
                 .build();
     }
 
+    private Receive<Command> createReceiveWhenAlreadyHaveCalculatedPrimeNumber(final BigInteger number) {
+        return newReceiveBuilder()
+                .onMessage(CalculatePrimeCommand.class, command -> {
+                    String path = getContext().getSelf().path().toString();
+                    command.sender().tell(new ManagerBehavior.ResultCommand(number, path));
+                    return Behaviors.same();
+                })
+                .build();
+    }
 
     private Behavior<Command> fullbackHandler(Command s) {
         LOGGER.debug("Fullback handler: {} ", s);

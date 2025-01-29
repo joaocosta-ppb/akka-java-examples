@@ -56,6 +56,8 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
         }
     }
 
+
+
     private static final Logger LOGGER = LoggerFactory.getLogger(ManagerBehavior.class);
     private final int numberOfWorkers;
 
@@ -83,11 +85,11 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                         LOGGER.info("Ignoring message {}", command.getMessage());
                     }
 
-                    return this;
+                    return Behaviors.same();
                 })
                 .onMessage(ResultCommand.class, command -> {
                     addNumber(command.getWorkerPath(), command.getNumber());
-                    return this;
+                    return Behaviors.same();
                 })
                 .onAnyMessage(this::fullbackHandler)
                 .build();
@@ -113,9 +115,10 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
             ActorRef<WorkerBehavior.Command> spawn = context.spawn(child, WorkerBehavior.class.getSimpleName() + "-" + i);
 
             LOGGER.info("Sending {} to worker #{}", Messages.START,  spawn.path());
-            spawn.tell(new WorkerBehavior.Command(Messages.START, context.getSelf()));
-            spawn.tell(new WorkerBehavior.Command(Messages.START, context.getSelf()));
-            spawn.tell(new WorkerBehavior.Command(Messages.START, context.getSelf()));
+            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
         }
     }
 

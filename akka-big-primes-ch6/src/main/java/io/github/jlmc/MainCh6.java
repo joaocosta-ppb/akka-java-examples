@@ -9,7 +9,7 @@ public class MainCh6 {
 
         ActorSystem<ManagerBehavior.Command> actorSystem = ActorSystem.create(mb, "Manager");
 
-        actorSystem.tell(new ManagerBehavior.InstructionCommand("do some thing..."));
+        //actorSystem.tell(new ManagerBehavior.InstructionCommand("do some thing..."));
         actorSystem.tell(new ManagerBehavior.InstructionCommand(Messages.START));
     }
 }
