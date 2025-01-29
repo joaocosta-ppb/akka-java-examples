@@ -10,12 +10,15 @@ import akka.actor.typed.javadsl.Receive;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Duration;
-import java.util.HashMap;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class RaceController extends AbstractBehavior<RaceController.Command> {
 
-    private Map<ActorRef<Runner.Command>, Integer> currentPositions;
+    private Map<ResultKey, Integer> currentPositions;
+    private Map<ResultKey, Long> finishedTimes;
+
     private static final String TIMER_KEY = "timer-key";
     private long start;
 
@@ -33,7 +36,36 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
                 .onMessage(StartRaceCommand.class, this::onStartRaceCommand)
                 .onMessage(RunnerUpdateCommand.class, this::onRunnerUpdateCommand)
                 .onMessage(GetPositionsCommand.class, this::onGetPositionsCommand)
+                .onMessage(RunnerFinishedCommand.class, this::onRunnerFinishedCommand)
                 .build();
+    }
+
+    private Receive<Command> raceCompletedMessageHandler() {
+        return newReceiveBuilder()
+                .onMessage(GetPositionsCommand.class, command -> {
+
+                    currentPositions.keySet()
+                            .forEach(runner -> getContext().stop(runner.runner()));
+
+                    displayRaceResult();
+
+                    return Behaviors.withTimers(timers -> {
+                        timers.cancelAll();
+                        return Behaviors.stopped();
+                    });
+                    //return Behaviors.same();
+                })
+                .build();
+    }
+
+    private Behavior<Command> onRunnerFinishedCommand(RunnerFinishedCommand command) {
+        finishedTimes.put(new ResultKey(command.runner(), command.runnerId()), System.currentTimeMillis());
+
+        if (finishedTimes.size() == currentPositions.size()) {
+            return raceCompletedMessageHandler();
+        }
+
+        return Behaviors.same();
     }
 
     private Behavior<Command> onGetPositionsCommand(GetPositionsCommand command) {
@@ -43,7 +75,7 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
 
         currentPositions.keySet()
                 .forEach(runner -> {
-                    runner.tell(new Runner.WhereAreYouQueryCommand(getContext().getSelf()));
+                    runner.runner().tell(new Runner.WhereAreYouQueryCommand(getContext().getSelf()));
                     displayRace();
                 });
 
@@ -56,42 +88,62 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
         System.out.println("Race has been running for " + ((System.currentTimeMillis() - start) / 1000) + " seconds.");
         System.out.println("    " + new String (new char[displayLength]).replace('\0', '='));
         int i = 0;
-        for (ActorRef<Runner.Command> racer : currentPositions.keySet()) {
-            System.out.println(i + " : "  + new String (new char[currentPositions.get(racer) * displayLength / 100]).replace('\0', '*'));
+        for (var racer : currentPositions.keySet()) {
+            System.out.println((racer.runnerId()) + "\t : "  + new String (new char[currentPositions.get(racer) * displayLength / 100]).replace('\0', '*'));
             i++;
         }
     }
 
+    private void displayRaceResult() {
+        System.out.println("Results");
+        finishedTimes.entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByValue())
+                .forEach(entry -> {
+
+                    String runner = entry.getKey().runnerId();
+
+                    System.out.printf("Runner %s finished in %s seconds%n", runner, parseTime(entry.getValue()));
+
+                });
+    }
+
+    private String parseTime(Long timestamp) {
+        Duration duration = Duration.between(Instant.ofEpochMilli(start), Instant.ofEpochMilli(timestamp));
+        return "%d.%03d".formatted(duration.getSeconds(), duration.toMillisPart());
+    }
+
     private Behavior<Command> onRunnerUpdateCommand(RunnerUpdateCommand command) {
-        currentPositions.put(command.runner(), command.position());
+        currentPositions.put(new ResultKey(command.runner(), command.runnerId()), command.position());
         return this;
     }
 
     private Behavior<Command> onStartRaceCommand(StartRaceCommand command) {
         ActorContext<Command> context = getContext();
 
-        currentPositions = new HashMap<>();
+        currentPositions = new LinkedHashMap<>();
+        finishedTimes = new LinkedHashMap<>();
+
         start = System.currentTimeMillis();
 
-        //List<ActorRef<Runner.Command>> actorRefs = new ArrayList<>();
         for (int i = 0; i < command.numberOfRunners; i++) {
             Behavior<Runner.Command> runner = Runner.createRacer();
 
             ActorRef<Runner.Command> runnerActor = context.spawn(runner, Runner.class.getSimpleName() + "_" + i);
 
-            currentPositions.put(runnerActor, 0);
-
-            //actorRefs.add(runnerActor);
+            String runnerNumber = "" + (i + 1);
+            currentPositions.put(new ResultKey(runnerActor, runnerNumber ), 0);
         }
 
-        currentPositions.keySet()
-                .forEach(actorRef -> {
-                    actorRef.tell(new Runner.StartRunningCommand(
+        for (Map.Entry<ResultKey, Integer> resultKeyIntegerEntry : currentPositions.entrySet()) {
+            resultKeyIntegerEntry.getKey().runner()
+                    .tell(new Runner.StartRunningCommand(
                             context.getSelf(),
                             command.raceLength(),
-                            command.defaultAvgSpeed()
-                            ));
-                });
+                            command.defaultAvgSpeed(),
+                            resultKeyIntegerEntry.getKey().runnerId()
+                    ));
+        }
 
         return Behaviors.withTimers(timer -> {
             timer.startTimerAtFixedRate(TIMER_KEY, new GetPositionsCommand(), Duration.ofSeconds(1));
@@ -110,7 +162,7 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
         private static final long serialVersionUID = 1L;
     }
 
-    record RunnerUpdateCommand(ActorRef<Runner.Command> runner, int position) implements Command {
+    record RunnerUpdateCommand(ActorRef<Runner.Command> runner, int position, String runnerId) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }
@@ -119,4 +171,13 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
         @Serial
         private static final long serialVersionUID = 1L;
     }
+
+    public record RunnerFinishedCommand(ActorRef<Runner.Command> runner, String runnerId) implements Command {
+        @Serial
+        private static final long serialVersionUID = 1L;
+    }
+
+    record ResultKey(ActorRef<Runner.Command> runner, String runnerId) {}
+
+
 }

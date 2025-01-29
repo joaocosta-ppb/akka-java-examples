@@ -43,8 +43,9 @@ public class Runner extends AbstractBehavior<Runner.Command> {
     private Receive<Command> completed(RunnerData position) {
         return newReceiveBuilder()
                 .onMessage(WhereAreYouQueryCommand.class, command -> {
-                    command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), position.currentPosition()));
-                    return Behaviors.same();
+                    command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), position.currentPosition(), position.runnerId()));
+                    command.sender().tell(new RaceController.RunnerFinishedCommand(getContext().getSelf(), position.runnerId()));
+                    return Behaviors.ignore(); // This actor will ignore any future message
                 })
                 .build();
     }
@@ -53,7 +54,7 @@ public class Runner extends AbstractBehavior<Runner.Command> {
         RunnerData next = data.next();
 
 
-        command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), next.currentPosition()));
+        command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), next.currentPosition(), data.runnerId()));
 
         if (next.isFinished()) {
             return completed(next);
@@ -63,7 +64,7 @@ public class Runner extends AbstractBehavior<Runner.Command> {
     }
 
     private Behavior<Command> onStartRunningCommand(StartRunningCommand command) {
-        RunnerData data = RunnerData.start(command.raceLength(), command.defaultAvgSpeed());
+        RunnerData data = RunnerData.start(command.raceLength(), command.defaultAvgSpeed(), command.runnerId());
 
         return running(data);
     }
@@ -73,7 +74,8 @@ public class Runner extends AbstractBehavior<Runner.Command> {
 
     record StartRunningCommand(ActorRef<RaceController.Command> sender,
                                int raceLength,
-                               double defaultAvgSpeed) implements Command {
+                               double defaultAvgSpeed,
+                               String runnerId) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }

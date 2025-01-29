@@ -2,10 +2,10 @@ package io.github.jlmc.race;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-record RunnerData(int raceLength, double defaultAvgSpeed, int avgSpeedAdjustmentFactor, int currentPosition, double currentSpeed) {
+record RunnerData(int raceLength, double defaultAvgSpeed, int avgSpeedAdjustmentFactor, int currentPosition, double currentSpeed, String runnerId) {
 
-    public static RunnerData start(int raceLength, double defaultAvgSpeed) {
-        return new RunnerData(raceLength, defaultAvgSpeed, generateRandomAvgSpeedAdjustmentFactor(), 0, 0);
+    public static RunnerData start(int raceLength, double defaultAvgSpeed, String runnerId) {
+        return new RunnerData(raceLength, defaultAvgSpeed, generateRandomAvgSpeedAdjustmentFactor(), 0, 0, runnerId);
     }
 
     public RunnerData next() {
@@ -16,7 +16,7 @@ record RunnerData(int raceLength, double defaultAvgSpeed, int avgSpeedAdjustment
             nextPosition = raceLength;
         }
 
-        return new RunnerData(raceLength, defaultAvgSpeed, avgSpeedAdjustmentFactor, (int) nextPosition, nextSpeed);
+        return new RunnerData(raceLength, defaultAvgSpeed, avgSpeedAdjustmentFactor, (int) nextPosition, nextSpeed, runnerId);
     }
 
     public boolean isFinished() {
