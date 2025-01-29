@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class RaceController extends AbstractBehavior<RaceController.Command> {
 
@@ -95,17 +96,18 @@ public class RaceController extends AbstractBehavior<RaceController.Command> {
     }
 
     private void displayRaceResult() {
-        System.out.println("Results");
-        finishedTimes.entrySet()
+
+        String resultText =
+                finishedTimes.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByValue())
-                .forEach(entry -> {
-
+                .map(entry -> {
                     String runner = entry.getKey().runnerId();
+                    return "Runner %s finished in %s seconds".formatted(runner, parseTime(entry.getValue()));
+                })
+                .collect(Collectors.joining("\n", "RESULTS: \n", "\n----"));
 
-                    System.out.printf("Runner %s finished in %s seconds%n", runner, parseTime(entry.getValue()));
-
-                });
+        System.out.println(resultText);
     }
 
     private String parseTime(Long timestamp) {

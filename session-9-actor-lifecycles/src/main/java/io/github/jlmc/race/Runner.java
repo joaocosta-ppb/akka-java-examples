@@ -2,6 +2,7 @@ package io.github.jlmc.race;
 
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.PostStop;
 import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
@@ -40,12 +41,23 @@ public class Runner extends AbstractBehavior<Runner.Command> {
                 .build();
     }
 
-    private Receive<Command> completed(RunnerData position) {
+    private Receive<Command> completed(RunnerData data) {
         return newReceiveBuilder()
                 .onMessage(WhereAreYouQueryCommand.class, command -> {
-                    command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), position.currentPosition(), position.runnerId()));
-                    command.sender().tell(new RaceController.RunnerFinishedCommand(getContext().getSelf(), position.runnerId()));
-                    return Behaviors.ignore(); // This actor will ignore any future message
+                    command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), data.currentPosition(), data.runnerId()));
+                    command.sender().tell(new RaceController.RunnerFinishedCommand(getContext().getSelf(), data.runnerId()));
+                    //return Behaviors.ignore(); // This actor will ignore any future message
+                    return waitingToStop(data);
+                })
+                .build();
+    }
+
+    private Receive<Command> waitingToStop(RunnerData data) {
+        return newReceiveBuilder()
+                .onAnyMessage(message -> Behaviors.same())
+                .onSignal(PostStop.class, signal -> {
+                    System.out.println(data.runnerId() +  "=> I'm about to terminate!");
+                    return Behaviors.same();
                 })
                 .build();
     }
