@@ -12,7 +12,7 @@ import java.io.Serializable;
 
 public class Runner extends AbstractBehavior<Runner.Command> {
 
-    private RunnerData data;
+    //private RunnerData data;
 
     private Runner(ActorContext<Command> context) {
         super(context);
@@ -24,28 +24,51 @@ public class Runner extends AbstractBehavior<Runner.Command> {
 
     @Override
     public Receive<Command> createReceive() {
+        return notYetStarted();
+    }
+
+    private Receive<Command> notYetStarted() {
         return newReceiveBuilder()
                 .onMessage(StartRunningCommand.class, this::onStartRunningCommand)
-                .onMessage(WhereAreYouQueryCommand.class, this::onWhereAreYouQueryCommand)
+                //.onMessage(WhereAreYouQueryCommand.class, this::onWhereAreYouQueryCommand)
                 .build();
     }
 
-    private Behavior<Command> onWhereAreYouQueryCommand(WhereAreYouQueryCommand command) {
+    private Receive<Command> running(RunnerData runnerData) {
+        return newReceiveBuilder()
+                //.onMessage(StartRunningCommand.class, this::onStartRunningCommand)
+                .onMessage(WhereAreYouQueryCommand.class, command -> onWhereAreYouQueryCommand(command, runnerData))
+                .build();
+    }
 
-        if (data != null) {
-            this.data = this.data.next();
+    private Receive<Command> completed(RunnerData position) {
+        return newReceiveBuilder()
+                //.onMessage(StartRunningCommand.class, this::onStartRunningCommand)
+                .onMessage(WhereAreYouQueryCommand.class, command -> {
+                    command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), position.currentPosition()));
+                    return Behaviors.same();
+                })
+                .build();
+    }
+
+
+    private Receive<Command> onWhereAreYouQueryCommand(WhereAreYouQueryCommand command, RunnerData data) {
+        RunnerData next = data.next();
+
+
+        command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), next.currentPosition()));
+
+        if (next.isFinished()) {
+            return completed(next);
         }
 
-        command.sender().tell(new RaceController.RunnerUpdateCommand(getContext().getSelf(), this.data.currentPosition()));
-
-        return this;
+        return running(next);
     }
 
     private Behavior<Command> onStartRunningCommand(StartRunningCommand command) {
-        this.data = RunnerData.start(command.raceLength(), command.defaultAvgSpeed());
+        RunnerData data = RunnerData.start(command.raceLength(), command.defaultAvgSpeed());
 
-
-        return this;
+        return running(data);
     }
 
     public interface Command extends Serializable {

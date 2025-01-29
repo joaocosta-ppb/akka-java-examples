@@ -9,14 +9,18 @@ record RunnerData(int raceLength, double defaultAvgSpeed, int avgSpeedAdjustment
     }
 
     public RunnerData next() {
-        double currentSpeed = determineNextSpeed();
+        double nextSpeed = determineNextSpeed();
 
         var nextPosition = currentPosition + getDistanceMovedPerSecond();
-        if (nextPosition > raceLength) {
+        if (nextPosition >= raceLength) {
             nextPosition = raceLength;
         }
 
-        return new RunnerData(raceLength, defaultAvgSpeed, avgSpeedAdjustmentFactor, (int) nextPosition, currentSpeed);
+        return new RunnerData(raceLength, defaultAvgSpeed, avgSpeedAdjustmentFactor, (int) nextPosition, nextSpeed);
+    }
+
+    public boolean isFinished() {
+        return currentPosition >= raceLength;
     }
 
     private double getMaxSpeed() {
