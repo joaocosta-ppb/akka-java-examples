@@ -1,5 +1,7 @@
 package io.github.jlmc.blockchain.entities;
 
+import java.util.Objects;
+
 /**
  * The wrapper for the transaction.
  */
@@ -8,7 +10,6 @@ public final class Block {
     private final String previousHash;
     private String hash;
     private int nonce;
-
 
     public Block(Transaction transaction, String previousHash) {
         this.transaction = transaction;
@@ -44,5 +45,17 @@ public final class Block {
 
     public String getHash() {
         return hash;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Block block = (Block) o;
+        return nonce == block.nonce && Objects.equals(transaction, block.transaction) && Objects.equals(previousHash, block.previousHash) && Objects.equals(hash, block.hash);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(transaction, previousHash, hash, nonce);
     }
 }

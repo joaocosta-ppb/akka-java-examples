@@ -1,5 +1,6 @@
 package io.github.jlmc.blockchain.akka;
 
+import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
@@ -32,12 +33,20 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
     private Behavior<Command> handlerCommand(StartMiningCommand command) {
         getContext().getLog().debug("Received command: {}", command);
 
-        HashResult hashResult = MineCalculator.mineBlock(command.block(), command.difficulty(), command.startNonce(), command.startNonce() + 1_000_000);
+        HashResult hashResult = MineCalculator.mineBlock(command.block(), command.difficulty(), command.startNonce(), command.endNonce());
 
         if (hashResult != null && hashResult.isCompleted()) {
             Block blockHash = command.block().withHashResult(hashResult);
 
-            getContext().getLog().debug("Block Hashed with nonce: {} and hash {}", blockHash.getNonce(), blockHash.getHash());
+             getContext().getLog().debug("Block Hashed with nonce: {} and hash {}", blockHash.getNonce(), blockHash.getHash());
+
+            if (command.controller() != null) {
+                ActorRef<Command> self = getContext().getSelf();
+
+                BlockHashedCommand blockHashedCommand = new BlockHashedCommand(blockHash, self);
+                command.controller().tell(blockHashedCommand);
+            }
+
 
         } else {
             getContext().getLog().debug("Block NOT Hashed: [{}]", command.block());
@@ -46,12 +55,12 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
         return Behaviors.same();
     }
 
-    interface Command extends Serializable {
+    public interface Command extends Serializable {
         //@Serial
         //private static final long serialVersionUID = 1L;
     }
 
-    public record StartMiningCommand(Block block, int startNonce, int difficulty) implements Command {
+    public record StartMiningCommand(Block block, int startNonce, int difficulty, int endNonce, ActorRef<BlockHashedCommand> controller) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }
