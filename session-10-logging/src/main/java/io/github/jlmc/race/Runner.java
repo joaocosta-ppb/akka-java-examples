@@ -56,7 +56,9 @@ public class Runner extends AbstractBehavior<Runner.Command> {
         return newReceiveBuilder()
                 .onAnyMessage(message -> Behaviors.same())
                 .onSignal(PostStop.class, signal -> {
-                    System.out.println(data.runnerId() +  "=> I'm about to terminate!");
+                    if (getContext().getLog().isInfoEnabled()) {
+                        getContext().getLog().info("{} - I'm about to terminate!", data.runnerId());
+                    }
                     return Behaviors.same();
                 })
                 .build();
