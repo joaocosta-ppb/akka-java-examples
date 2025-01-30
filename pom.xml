@@ -12,5 +12,6 @@
         <module>akka-big-primes-ch6</module>
         <module>session-7-racer-simulation</module>
         <module>session-9-actor-lifecycles</module>
+        <module>session-10-logging</module>
     </modules>
 </project>
