@@ -88,9 +88,10 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
             LOGGER.info("Sending {} to worker #{}", Messages.START, spawn.path());
             spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
-            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
-            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
-            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+
+            //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
         }
     }
 

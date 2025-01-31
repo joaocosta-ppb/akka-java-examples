@@ -49,8 +49,14 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
                 .onMessage(CalculatePrimeCommand.class, command -> {
                     BigInteger  randomNumber = new BigInteger(2000, ThreadLocalRandom.current());
                     BigInteger prime = randomNumber.nextProbablePrime();
-                    command.sender().tell(new ManagerBehavior.ResultCommand(prime, getContext().getSelf().path().toString()));
-                    //return Behaviors.same();
+
+                    if (ThreadLocalRandom.current().nextBoolean()) {
+                        command.sender().tell(new ManagerBehavior.ResultCommand(prime, getContext().getSelf().path().toString()));
+                    } else {
+                        getContext().getLog().warn("worker '{}' not communicate top level the Prime number: {}!", getContext().getSelf().path(), prime);
+                    }
+
+
                     return createReceiveWhenAlreadyHaveCalculatedPrimeNumber(prime);
                 })
                 .onAnyMessage(this::fullbackHandler)
