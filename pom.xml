@@ -25,6 +25,7 @@
         <module>session-10-logging</module>
         <module>session-11-blockchain</module>
         <module>session-12-blockchain-akka</module>
+        <module>session-13-interraction-patterns</module>
     </modules>
 
     <dependencyManagement>
