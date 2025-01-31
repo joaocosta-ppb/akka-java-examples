@@ -6,12 +6,14 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import akka.io.SelectionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.time.Duration;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -26,6 +28,11 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     }
 
     public record ResultCommand(BigInteger number, String workerPath) implements Command {
+        @Serial
+        private static final long serialVersionUID = 1L;
+    }
+
+    record NoResponseReceivedCommand(ActorRef<WorkerBehavior.Command> worker) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }
@@ -63,6 +70,12 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                     addNumber(command.workerPath(), command.number());
                     return Behaviors.same();
                 })
+                .onMessage(NoResponseReceivedCommand.class, command -> {
+                    // retry
+                    getContext().getLog().info("No response received, Retrying with the worker: {}", command.worker().path());
+                    askWorkerForPrimeNumber(command.worker());
+                    return Behaviors.same();
+                })
                 .onAnyMessage(this::fullbackHandler)
                 .build();
     }
@@ -84,16 +97,38 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
             LOGGER.info("Instantiate worker #{}", i);
             Behavior<WorkerBehavior.Command> child = WorkerBehavior.createWorkerBehavior();
 
-            ActorRef<WorkerBehavior.Command> spawn = context.spawn(child, WorkerBehavior.class.getSimpleName() + "-" + i);
+            ActorRef<WorkerBehavior.Command> worker = context.spawn(child, WorkerBehavior.class.getSimpleName() + "-" + i);
 
-            LOGGER.info("Sending {} to worker #{}", Messages.START, spawn.path());
-            spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            LOGGER.info("Sending {} to worker #{}", Messages.START, worker.path());
+            //worker.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
+            askWorkerForPrimeNumber(worker);
 
             //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
             //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
             //spawn.tell(new WorkerBehavior.CalculatePrimeCommand(context.getSelf()));
         }
     }
+
+
+
+
+    private void askWorkerForPrimeNumber(ActorRef<WorkerBehavior.Command> worker) {
+
+        getContext().ask(
+                ManagerBehavior.Command.class,
+                worker,
+                Duration.ofSeconds(5L),
+                me -> new WorkerBehavior.CalculatePrimeCommand(me),
+                (response, throwable) -> {
+                    if (response != null) {
+                        return response;
+                    }
+
+                    getContext().getLog().warn("An error occurred while asking for prime number {}", worker.path(), throwable);
+                    return new NoResponseReceivedCommand(worker);
+                });
+    }
+
 
     private Behavior<Command> fullbackHandler(Command s) {
         LOGGER.debug("Fullback handler: {} ", s);

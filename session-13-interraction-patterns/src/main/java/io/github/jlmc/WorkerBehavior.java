@@ -56,7 +56,6 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
                         getContext().getLog().warn("worker '{}' not communicate top level the Prime number: {}!", getContext().getSelf().path(), prime);
                     }
 
-
                     return createReceiveWhenAlreadyHaveCalculatedPrimeNumber(prime);
                 })
                 .onAnyMessage(this::fullbackHandler)
@@ -75,6 +74,6 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
 
     private Behavior<Command> fullbackHandler(Command s) {
         LOGGER.debug("Fullback handler: {} ", s);
-        return this;
+        return Behaviors.same();
     }
 }
