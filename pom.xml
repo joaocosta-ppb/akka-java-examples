@@ -26,6 +26,7 @@
         <module>session-11-blockchain</module>
         <module>session-12-blockchain-akka</module>
         <module>session-13-interraction-patterns</module>
+        <module>session-14-actor-supervision</module>
     </modules>
 
     <dependencyManagement>
