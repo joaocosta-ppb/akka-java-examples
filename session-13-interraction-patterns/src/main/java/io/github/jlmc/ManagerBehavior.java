@@ -6,7 +6,6 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
-import akka.io.SelectionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +13,8 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.time.Duration;
+import java.util.Collection;
+import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -22,7 +23,7 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     public interface Command extends Serializable {
     }
 
-    public record InstructionCommand(String message) implements Command {
+    public record InstructionCommand(String message, ActorRef<Collection<BigInteger>> replayTo) implements Command {
         @Serial
         private static final long serialVersionUID = 1L;
     }
@@ -42,6 +43,8 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
     private final SortedSet<BigInteger> numbers = new TreeSet<>();
 
+    private ActorRef<Collection<BigInteger>> replayTo;
+
     private ManagerBehavior(ActorContext<Command> context, int numberOfWorkers) {
         super(context);
         this.numberOfWorkers = numberOfWorkers;
@@ -59,7 +62,7 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
         return newReceiveBuilder()
                 .onMessage(InstructionCommand.class, command -> {
                     if (Messages.START.equals(command.message())) {
-                        startHandler();
+                        startHandler(command.replayTo());
                     } else {
                         LOGGER.info("Ignoring message {}", command.message());
                     }
@@ -86,11 +89,16 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
         if (numbers.size() == 20) {
             LOGGER.info("Received all the result numbers => {}", numbers);
+            // send all the prime numbers to the top level
+            replayTo.tell(List.copyOf(numbers));
         }
     }
 
-    private void startHandler() {
-        LOGGER.info("Starting ManagerBehavior");
+    private void startHandler(ActorRef<Collection<BigInteger>> replayTo) {
+        getContext().getLog().info("Starting ManagerBehavior");
+
+        this.replayTo = replayTo;
+
         ActorContext<Command> context = getContext();
 
         for (int i = 0; i < numberOfWorkers; i++) {

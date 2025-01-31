@@ -88,3 +88,41 @@ The Ask Pattern in Akka allows sending a message to an actor and expecting a fut
 - ✅ When you need a result from an actor.
 - ✅ When calling actors from outside (e.g., controllers, APIs).
 - ✅ When integrating with Java Futures & Streams.
+
+--- 
+### Using the ask pattern outside akka
+
+1. use the ASKPattern the main method
+   ```
+       public static void main(String[] args) {
+           Behavior<ManagerBehavior.Command> mb = ManagerBehavior.createNewInstance(20);
+   
+           ActorSystem<ManagerBehavior.Command> manager = ActorSystem.create(mb, "Manager");
+   
+           CompletionStage<Collection<BigInteger>> completed =
+                   AskPattern.ask(
+                           manager,
+                           me -> new ManagerBehavior.InstructionCommand(Messages.START, me),
+                           Duration.ofSeconds(30),
+                           manager.scheduler()
+                   );
+   
+           completed.whenComplete((response, throwable) -> {
+               if (response != null) {
+                   displayResult(response);
+               } else {
+                   System.out.println("System didn't respond in time");
+               }
+               manager.terminate();
+           });
+   
+       }
+   ```
+2. In the Worker replay when the all numbers are filled
+   ```
+           if (numbers.size() == 20) {
+               LOGGER.info("Received all the result numbers => {}", numbers);
+               // send all the prime numbers to the top level
+               replayTo.tell(List.copyOf(numbers));
+           }
+   ```
