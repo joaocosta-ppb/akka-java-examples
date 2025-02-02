@@ -34,15 +34,15 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
     @Override
     public Receive<Command> createReceive() {
+        return idleMessageHandler();
+    }
+
+    private Receive<Command> idleMessageHandler() {
         return newReceiveBuilder()
                 .onSignal(Terminated.class, signal -> {
                     // Every this a worker terminate the manager receives this signal
-                    getContext().getLog().info("Child {} has terminated.", signal.getRef().path().name());
-
-                    // we can create a new worker to replace the one that has terminated.
-                    startNextWorker(blockToHash, difficultly);
-
-                    return this;
+                    //getContext().getLog().info("Child {} has terminated.", signal.getRef().path().name());
+                    return Behaviors.same();
                 })
                 .onMessage(MineBlockCommand.class, command -> {
 
@@ -56,6 +56,21 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                         startNextWorker(blockToHash, difficultly);
                     }
 
+                    return activeMessageHandler();
+                })
+
+                .build();
+    }
+
+    private Receive<Command> activeMessageHandler() {
+        return newReceiveBuilder()
+                .onSignal(Terminated.class, signal -> {
+                    // Every this a worker terminate the manager receives this signal
+                    getContext().getLog().info("Child {} has terminated.", signal.getRef().path().name());
+
+                    // we can create a new worker to replace the one that has terminated.
+                    startNextWorker(blockToHash, difficultly);
+
                     return Behaviors.same();
                 })
                 .onMessage(BlockHashedSucessfulCommand.class, command -> {
@@ -68,6 +83,13 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                     // send the result to the parent
                     ActorRef<Command> self = getContext().getSelf();
                     replayTo.tell(new ResultCommand(blockHashed, self));
+
+                    return idleMessageHandler();
+                })
+                .onMessage(MineBlockCommand.class, message -> {
+                    getContext().getLog().info("Delaying a mining request...");
+
+                    getContext().getSelf().tell(message);
 
                     return Behaviors.same();
                 })
