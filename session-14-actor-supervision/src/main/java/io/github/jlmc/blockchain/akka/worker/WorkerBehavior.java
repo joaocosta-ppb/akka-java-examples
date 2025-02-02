@@ -51,12 +51,18 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
                 ManagerBehavior.BlockHashedSucessfulCommand blockHashedCommand = new ManagerBehavior.BlockHashedSucessfulCommand(blockHash, self);
                 command.replayTo().tell(blockHashedCommand);
             }
+            return Behaviors.same();
 
         } else {
             getContext().getLog().debug("Block NOT Hashed: [{}] [{}] ", getContext().getSelf().path(), command.block());
+
+            // when the worker do not found any hash it closes itself down. Considering that is job is done.
+            // When a worker stops it send a signal to it parent, Terminate Signal
+            // when we use watch, that signal can not be ignored anymore
+            return Behaviors.stopped();
         }
 
-        return Behaviors.same();
+
     }
 
     public interface Command extends Serializable {

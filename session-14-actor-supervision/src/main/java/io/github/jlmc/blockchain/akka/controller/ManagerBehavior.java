@@ -2,6 +2,8 @@ package io.github.jlmc.blockchain.akka.controller;
 
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
+import akka.actor.typed.SupervisorStrategy;
+import akka.actor.typed.Terminated;
 import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
@@ -16,8 +18,11 @@ import static io.github.jlmc.blockchain.akka.Constants.SPLIT_SIZE;
 
 public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
-    ActorRef<Map<String, Object>> replayTo;
-    long currentNonce = 0;
+    private ActorRef<Map<String, Object>> replayTo;
+    private long currentNonce = 0;
+    private Block blockToHash;
+    private int difficultly;
+    private boolean currentlyMining = false;
 
     private ManagerBehavior(ActorContext<Command> context) {
         super(context);
@@ -30,23 +35,37 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     @Override
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
+                .onSignal(Terminated.class, handler -> {
+                    // Every this a worker terminate the manager receives this signal
 
+                    // we can create a new worker to replace the one that has terminated.
+                    startNextWorker(blockToHash, difficultly);
+
+                    return Behaviors.same();
+                })
                 .onMessage(MineBlockCommand.class, command -> {
 
                     // create worker actors
                     this.replayTo = command.replayTo();
+                    this.blockToHash = command.block();
+                    this.difficultly = command.difficultly();
+                    this.currentlyMining = true;
 
                     for (int i = 0; i < command.numberOfWorkers(); i++) {
-                        startNextWorker(command);
+                        startNextWorker(blockToHash, difficultly);
                     }
 
-                    //command.replayTo().tell(Map.of("command", "AAAAA"));
                     return Behaviors.same();
                 })
                 .onMessage(BlockHashedSucessfulCommand.class, command -> {
+                    stopAllActiveWorkerChild();
+
                     Block blockHashed = command.block();
                     ActorRef<WorkerBehavior.Command> worker = command.worker();
 
+                    this.currentlyMining = false;
+
+                    // send the result to the parent
                     replayTo.tell(Map.of("result", blockHashed));
 
                     return Behaviors.ignore();
@@ -54,14 +73,36 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                 .build();
     }
 
-    private void startNextWorker(MineBlockCommand command) {
-        String workerId = "worker-%d".formatted(currentNonce);
-        var worker = getContext().spawn(WorkerBehavior.create(), workerId);
+    private void stopAllActiveWorkerChild() {
+        // close all active worker
+        for (ActorRef<Void> child : getContext().getChildren()) {
+            getContext().stop(child);
+        }
+    }
 
+    private void startNextWorker(Block block, int difficultly) {
+        if (!currentlyMining) {
+            return;
+        }
+
+        String workerId = "worker-%d".formatted(currentNonce);
+
+        //
+        var supervisedWorker =
+                Behaviors.supervise(WorkerBehavior.create())
+                        // when worker crashed
+                        .onFailure(SupervisorStrategy.resume());
+
+        ActorRef<WorkerBehavior.Command> worker = getContext().spawn(supervisedWorker, workerId);
+
+        // declaring a watch of the worker
+        getContext().watch(worker);
+
+        // tell the work to start it job
         worker.tell(new WorkerBehavior.StartMiningCommand(
-                command.block,
+                block,
                 (int) (currentNonce * SPLIT_SIZE),
-                command.difficultly,
+                difficultly,
                 getContext().getSelf()));
 
         currentNonce++;
