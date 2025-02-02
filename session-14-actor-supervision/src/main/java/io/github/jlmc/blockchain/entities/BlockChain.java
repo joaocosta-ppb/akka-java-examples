@@ -2,10 +2,8 @@ package io.github.jlmc.blockchain.entities;
 
 import io.github.jlmc.blockchain.hash.MineCalculator;
 
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 
 public final class BlockChain implements Iterable<Block> {
     private final LinkedList<Block> blocks = new LinkedList<>();
@@ -31,8 +29,16 @@ public final class BlockChain implements Iterable<Block> {
         this.blocks.add(block);
     }
 
+    public int size() {
+        return blocks.size();
+    }
+
     @Override
     public Iterator<Block> iterator() {
         return blocks.iterator();
+    }
+
+    public String getLastHash() {
+        return this.blocks.getLast().getHash();
     }
 }

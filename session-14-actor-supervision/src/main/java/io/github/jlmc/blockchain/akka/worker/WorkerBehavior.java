@@ -59,7 +59,9 @@ public class WorkerBehavior extends AbstractBehavior<WorkerBehavior.Command> {
             // when the worker do not found any hash it closes itself down. Considering that is job is done.
             // When a worker stops it send a signal to it parent, Terminate Signal
             // when we use watch, that signal can not be ignored anymore
+            //return Behaviors.stopped();
             return Behaviors.stopped();
+            //throw new RuntimeException("Force stop");
         }
 
 

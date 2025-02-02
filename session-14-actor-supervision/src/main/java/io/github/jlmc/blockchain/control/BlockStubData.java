@@ -30,4 +30,8 @@ public final class BlockStubData {
         return new Block(transaction, lastHash);
     }
 
+    public static int transactionsSize() {
+        return TIMESTAMPS.length;
+    }
+
 }

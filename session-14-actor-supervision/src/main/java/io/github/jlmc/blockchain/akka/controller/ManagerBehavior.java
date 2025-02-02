@@ -12,13 +12,13 @@ import io.github.jlmc.blockchain.akka.worker.WorkerBehavior;
 import io.github.jlmc.blockchain.entities.Block;
 
 import java.io.Serializable;
-import java.util.Map;
+import java.util.UUID;
 
 import static io.github.jlmc.blockchain.akka.Constants.SPLIT_SIZE;
 
 public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
 
-    private ActorRef<Map<String, Object>> replayTo;
+    private ActorRef<Command> replayTo;
     private long currentNonce = 0;
     private Block blockToHash;
     private int difficultly;
@@ -35,13 +35,27 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     @Override
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
-                .onSignal(Terminated.class, handler -> {
+                /*.onSignal(Terminated.class, handler -> {
                     // Every this a worker terminate the manager receives this signal
 
                     // we can create a new worker to replace the one that has terminated.
                     startNextWorker(blockToHash, difficultly);
 
                     return Behaviors.same();
+                })*/
+                //.onSignal(Terminated.class, handler -> {
+                //    System.out.println("Terminated ===> ");
+                //    startNextWorker(blockToHash, difficultly);
+                //    return Behaviors.same();
+                //})
+                .onSignal(Terminated.class, signal -> {
+                    // Every this a worker terminate the manager receives this signal
+                    getContext().getLog().info("Child {} has terminated.", signal.getRef().path().name());
+
+                    // we can create a new worker to replace the one that has terminated.
+                    startNextWorker(blockToHash, difficultly);
+
+                    return this;
                 })
                 .onMessage(MineBlockCommand.class, command -> {
 
@@ -61,14 +75,14 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                     stopAllActiveWorkerChild();
 
                     Block blockHashed = command.block();
-                    ActorRef<WorkerBehavior.Command> worker = command.worker();
 
                     this.currentlyMining = false;
 
                     // send the result to the parent
-                    replayTo.tell(Map.of("result", blockHashed));
+                    ActorRef<Command> self = getContext().getSelf();
+                    replayTo.tell(new ResultCommand(blockHashed, self));
 
-                    return Behaviors.ignore();
+                    return Behaviors.same();
                 })
                 .build();
     }
@@ -85,36 +99,31 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
             return;
         }
 
-        String workerId = "worker-%d".formatted(currentNonce);
+        String workerId = "worker-%d-%s".formatted(currentNonce, UUID.randomUUID());
+        int startNonce = (int) currentNonce * SPLIT_SIZE;
 
-        //
-        var supervisedWorker =
-                Behaviors.supervise(WorkerBehavior.create())
-                        // when worker crashed
-                        .onFailure(SupervisorStrategy.resume());
 
-        ActorRef<WorkerBehavior.Command> worker = getContext().spawn(supervisedWorker, workerId);
+        getContext().getLog().info("About to start mining with nonces starting at {} on the worker id {}", startNonce, workerId);
 
-        // declaring a watch of the worker
+        Behavior<WorkerBehavior.Command> workerBehavior =
+                    Behaviors.supervise(WorkerBehavior.create()).onFailure(SupervisorStrategy.resume());
+
+        //ActorRef<WorkerBehavior.Command> worker = getContext().spawn(WorkerBehavior.create(), workerId);
+        ActorRef<WorkerBehavior.Command> worker = getContext().spawn(workerBehavior, workerId);
         getContext().watch(worker);
-
-        // tell the work to start it job
-        worker.tell(new WorkerBehavior.StartMiningCommand(
-                block,
-                (int) (currentNonce * SPLIT_SIZE),
-                difficultly,
-                getContext().getSelf()));
-
+        worker.tell(new WorkerBehavior.StartMiningCommand(block, startNonce, difficultly, getContext().getSelf()));
         currentNonce++;
     }
 
     public interface Command extends Serializable {
     }
 
-    public record MineBlockCommand(ActorRef<Map<String, Object>> replayTo, Block block, int difficultly,
+    public record MineBlockCommand(ActorRef<Command> replayTo, Block block, int difficultly,
                                    int numberOfWorkers) implements Command {
     }
 
     public record BlockHashedSucessfulCommand(Block block, ActorRef<WorkerBehavior.Command> worker) implements Command {
     }
+
+    public record ResultCommand(Block block, ActorRef<ManagerBehavior.Command> worker) implements Command {}
 }
