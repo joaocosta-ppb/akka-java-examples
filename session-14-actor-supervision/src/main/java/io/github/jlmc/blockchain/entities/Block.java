@@ -58,4 +58,14 @@ public final class Block {
     public int hashCode() {
         return Objects.hash(transaction, previousHash, hash, nonce);
     }
+
+    @Override
+    public String toString() {
+        return "Block{" +
+                "previousHash='" + previousHash + '\'' +
+                ", hash='" + hash + '\'' +
+                ", nonce='" + nonce + '\'' +
+                ", transaction=" + transaction +
+                '}';
+    }
 }

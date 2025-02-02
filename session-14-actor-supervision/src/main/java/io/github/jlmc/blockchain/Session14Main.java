@@ -1,66 +1,59 @@
 package io.github.jlmc.blockchain;
 
-import io.github.jlmc.blockchain.control.BlockStubData;
-import io.github.jlmc.blockchain.hash.MineCalculator;
+import akka.actor.typed.ActorSystem;
+import akka.actor.typed.javadsl.AskPattern;
+import io.github.jlmc.blockchain.akka.controller.ManagerBehavior;
 import io.github.jlmc.blockchain.entities.Block;
-import io.github.jlmc.blockchain.entities.BlockChain;
-import io.github.jlmc.blockchain.entities.HashResult;
+import io.github.jlmc.blockchain.entities.Transaction;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
 
 public class Session14Main {
 
     public static void main(String[] args) {
 
-        int difficultyLevel = 6;
+        Block block = getBlock();
 
-        Long start = System.currentTimeMillis();
+        ActorSystem<ManagerBehavior.Command> manager = ActorSystem.create(ManagerBehavior.create(), "BlockchainManager");
 
-        BlockChain blocks = BlockChain.empty();
+        CompletionStage<Map<String, Object>> completed =
+                AskPattern.ask(
+                        manager,
+                        me -> new ManagerBehavior.MineBlockCommand(me, block, 5, 5),
+                        Duration.ofMinutes(30),
+                        manager.scheduler()
+                );
 
-        String lastHash = "0";
-        for (int i = 0; i < 10; i++) {
-            Block nextBlock = BlockStubData.getNextBlock(i, lastHash);
-
-            HashResult hashResult = MineCalculator.mineBlock(nextBlock, difficultyLevel, 0, 100000000);
-            if (hashResult == null) {
-                throw new RuntimeException("Didn't find a valid hash for block " + i);
+        completed.whenComplete((response, throwable) -> {
+            if (response != null) {
+                System.out.println("Finished processing.");
+                System.out.println(response);
+            } else {
+                System.out.println("System didn't respond in time");
             }
+            manager.terminate();
+        });
 
-            Block block = nextBlock.withHashResult(hashResult);
-
-            blocks.add(block);
-
-            System.out.println("Block " + i + " hash : " + block.getHash());
-            System.out.println("Block " + i + " nonce: " + block.getNonce());
-            lastHash = block.getHash();
-        }
-
-        Long end = System.currentTimeMillis();
-        printAndValidate(blocks);
-
-        System.out.println("Time taken " + (end - start) + " ms.");
     }
 
-    private static void printAndValidate(BlockChain blocks) {
 
-        String lastHash = "0";
-        for (Block block : blocks) {
-            System.out.println("Block " + block.getTransaction().id() + " ");
-            System.out.println(block.getTransaction());
+    private static Block getBlock() {
+        final long timestamp = LocalDateTime.of(2015, 6, 22, 14, 21).toInstant(ZoneOffset.UTC).toEpochMilli();
+        final int transactionId = 0;
+        final int customerNumber = 1732;
+        final double amount = 103.27D;
+        final String lastHash = "0";
 
-            if (block.getPreviousHash().equals(lastHash)) {
-                System.out.print("Last hash matches ");
-            } else {
-                System.out.print("Last hash doesn't match ");
-            }
+        Transaction transaction = new Transaction(transactionId,
+                timestamp, customerNumber, amount);
 
-            if (MineCalculator.validateBlock(block)) {
-                System.out.println("and hash is valid");
-            } else {
-                System.out.println("and hash is invalid");
-            }
-
-            lastHash = block.getHash();
-
-        }
+        return new Block(transaction, lastHash);
     }
+
+
+
 }
