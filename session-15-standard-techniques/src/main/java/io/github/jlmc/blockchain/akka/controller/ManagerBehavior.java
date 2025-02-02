@@ -8,6 +8,7 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import akka.actor.typed.javadsl.StashBuffer;
 import io.github.jlmc.blockchain.akka.worker.WorkerBehavior;
 import io.github.jlmc.blockchain.entities.Block;
 
@@ -24,12 +25,17 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     private int difficultly;
     private boolean currentlyMining = false;
 
-    private ManagerBehavior(ActorContext<Command> context) {
+    private final StashBuffer<Command> stashBuffer;
+
+    private ManagerBehavior(ActorContext<Command> context, StashBuffer<Command> stashBuffer) {
         super(context);
+        this.stashBuffer = stashBuffer;
     }
 
     public static Behavior<Command> create() {
-        return Behaviors.setup(ManagerBehavior::new);
+        // create a actor with stash
+        return Behaviors.withStash(20,
+                stash -> Behaviors.setup(c -> new ManagerBehavior(c, stash)));
     }
 
     @Override
@@ -84,12 +90,15 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
                     ActorRef<Command> self = getContext().getSelf();
                     replayTo.tell(new ResultCommand(blockHashed, self));
 
-                    return idleMessageHandler();
+                    return stashBuffer.unstashAll(idleMessageHandler());
+
                 })
                 .onMessage(MineBlockCommand.class, message -> {
                     getContext().getLog().info("Delaying a mining request...");
 
-                    getContext().getSelf().tell(message);
+                    if (!stashBuffer.isFull()) {
+                        stashBuffer.stash(message);
+                    }
 
                     return Behaviors.same();
                 })
@@ -115,7 +124,7 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
         getContext().getLog().info("About to start mining with nonces starting at {} on the worker id {}", startNonce, workerId);
 
         Behavior<WorkerBehavior.Command> workerBehavior =
-                    Behaviors.supervise(WorkerBehavior.create()).onFailure(SupervisorStrategy.resume());
+                Behaviors.supervise(WorkerBehavior.create()).onFailure(SupervisorStrategy.resume());
 
         //ActorRef<WorkerBehavior.Command> worker = getContext().spawn(WorkerBehavior.create(), workerId);
         ActorRef<WorkerBehavior.Command> worker = getContext().spawn(workerBehavior, workerId);
@@ -134,5 +143,6 @@ public class ManagerBehavior extends AbstractBehavior<ManagerBehavior.Command> {
     public record BlockHashedSucessfulCommand(Block block, ActorRef<WorkerBehavior.Command> worker) implements Command {
     }
 
-    public record ResultCommand(Block block, ActorRef<ManagerBehavior.Command> worker) implements Command {}
+    public record ResultCommand(Block block, ActorRef<ManagerBehavior.Command> worker) implements Command {
+    }
 }
