@@ -3,6 +3,7 @@ package io.github.jlmc.blockchain;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.javadsl.AskPattern;
 import io.github.jlmc.blockchain.akka.controller.ManagerBehavior;
+import io.github.jlmc.blockchain.akka.router.MiningSystemBehavior;
 import io.github.jlmc.blockchain.control.BlockStubData;
 import io.github.jlmc.blockchain.entities.Block;
 import io.github.jlmc.blockchain.entities.BlockChain;
@@ -19,8 +20,7 @@ public class Session15Main {
     static ActorSystem<ManagerBehavior.Command> actorSystem;
 
     public static void mineBlocks() {
-
-        actorSystem = ActorSystem.create(ManagerBehavior.create(), "BlockChainMiner");
+        actorSystem = ActorSystem.create(MiningSystemBehavior.create(), "BlockChainMiner");
         mineNextBlock();
     }
 
