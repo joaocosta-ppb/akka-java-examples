@@ -28,6 +28,7 @@
         <module>session-13-interraction-patterns</module>
         <module>session-14-actor-supervision</module>
         <module>session-15-standard-techniques</module>
+        <module>session-23-akka-streams</module>
     </modules>
 
     <dependencyManagement>
