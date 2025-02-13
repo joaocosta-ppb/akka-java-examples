@@ -25,7 +25,7 @@ public class ExploringFlows {
 
         Source<Integer, NotUsed> numbersSource = Source.range(1, 1000); //.throttle(1, Duration.ofSeconds(1));
 
-        Sink<String, CompletionStage<Done>> printSkin = Sink.foreach(System.out::println);
+        Sink<List<String>, CompletionStage<Done>> printSkin = Sink.foreach(System.out::println);
 
 
         Flow<Integer, String, NotUsed> flow =
@@ -35,7 +35,9 @@ public class ExploringFlows {
                         .map(incomingValue -> "The next value is " + incomingValue) // convert the integer;
         ;
 
+        Flow<String, List<String>, NotUsed> grouped = Flow.of(String.class).grouped(3);
 
-        numbersSource.via(flow).to(printSkin).run(actorSystem);
+
+        numbersSource.via(flow).via(grouped).to(printSkin).run(actorSystem);
     }
 }
