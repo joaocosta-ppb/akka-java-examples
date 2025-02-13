@@ -23,13 +23,14 @@ public class ExploringFlows {
     public static void main(String[] args) {
         ActorSystem actorSystem = ActorSystem.create(Behaviors.empty(), "ExploringFlows");
 
-        Source<Integer, NotUsed> numbersSource = Source.range(1, 1000).throttle(1, Duration.ofSeconds(1));
+        Source<Integer, NotUsed> numbersSource = Source.range(1, 1000); //.throttle(1, Duration.ofSeconds(1));
 
         Sink<String, CompletionStage<Done>> printSkin = Sink.foreach(System.out::println);
 
 
         Flow<Integer, String, NotUsed> flow =
                 Flow.of(Integer.class)
+                        .filter(value -> value % 17 == 0)
                         .map(incomingValue -> "The next value is " + incomingValue) // convert the integer;
         ;
 
