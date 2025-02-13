@@ -25,19 +25,21 @@ public class ExploringFlows {
 
         Source<Integer, NotUsed> numbersSource = Source.range(1, 1000); //.throttle(1, Duration.ofSeconds(1));
 
-        Sink<List<String>, CompletionStage<Done>> printSkin = Sink.foreach(System.out::println);
+        Sink<Members, CompletionStage<Done>> printSkin = Sink.foreach(System.out::println);
 
 
         Flow<Integer, String, NotUsed> flow =
                 Flow.of(Integer.class)
                         .filter(value -> value % 17 == 0)
                         .mapConcat(param -> List.of(param, param + 1, param + 2))
-                        .map(incomingValue -> "The next value is " + incomingValue) // convert the integer;
+                        .map(incomingValue -> "" + incomingValue) // convert the integer;
         ;
 
-        Flow<String, List<String>, NotUsed> grouped = Flow.of(String.class).grouped(3);
+        Flow<String, Members, NotUsed> grouped = Flow.of(String.class).grouped(3).map(list -> new Members(list));
 
 
         numbersSource.via(flow).via(grouped).to(printSkin).run(actorSystem);
     }
+
+    record Members(List<String> items) {}
 }
