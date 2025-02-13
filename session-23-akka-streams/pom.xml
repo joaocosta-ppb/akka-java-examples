@@ -5,6 +5,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>1-akka-streams</module>
+        <module>2-akka-streams</module>
     </modules>
 
     <parent>
