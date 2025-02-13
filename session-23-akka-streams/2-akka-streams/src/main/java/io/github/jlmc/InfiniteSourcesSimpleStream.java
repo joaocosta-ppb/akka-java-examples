@@ -9,6 +9,7 @@ import akka.stream.javadsl.RunnableGraph;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -51,8 +52,12 @@ public class InfiniteSourcesSimpleStream {
         Iterator<String> infiniteRange = IntStream.iterate(0, i -> i +1)
                 .mapToObj(i -> "Hero => " + i)
                 .iterator();
-        Source<String, NotUsed> infiniteRangeSource = Source.fromIterator(() -> infiniteRange);
-
+        //Source<String, NotUsed> infiniteRangeSource = Source.fromIterator(() -> infiniteRange);
+        Source<String, NotUsed> infiniteRangeSource =
+                Source.fromIterator(() -> infiniteRange)
+                        .throttle(1, Duration.ofSeconds(5)) // send a element at max 3 seconds
+                        .take(5) // stop the at a fixed number elements
+        ;
 
         //
         Source<String, NotUsed> source = infiniteRangeSource;
