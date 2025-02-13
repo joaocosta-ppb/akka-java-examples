@@ -1,0 +1,53 @@
+package io.github.jlmc;
+
+import akka.Done;
+import akka.NotUsed;
+import akka.actor.typed.ActorSystem;
+import akka.actor.typed.javadsl.Behaviors;
+import akka.stream.javadsl.Flow;
+import akka.stream.javadsl.RunnableGraph;
+import akka.stream.javadsl.Sink;
+import akka.stream.javadsl.Source;
+
+import java.util.concurrent.CompletionStage;
+
+/**
+ * <pre>
+ *  ---------     -------                  --------
+ * | Source | => | Flow |=> (3),(2),(1) => | Skin |
+ * ---------     -------                   -------
+ * </pre>
+ */
+public class SimpleStream {
+    public static void main(String[] args) {
+        // Generate a source, it takes two data types,
+        //  1. the first (Integer) it is the input type
+        //  2. The materialize value type
+        Source<Integer, NotUsed> source = Source.range(1, 10);
+
+        //
+        Flow<Integer, String, NotUsed> flow = Flow.of(Integer.class)
+                .map(incomingValue -> "The next value is " + incomingValue) // convert the integer
+        ;
+
+        // Create a sink, Define what to do with the data
+        Sink<String, CompletionStage<Done>> sink =
+                Sink.foreach(value -> {
+                    System.out.println("==> " + value);
+                });
+
+        // putting all together, to create the graph
+
+        RunnableGraph<NotUsed> graph =
+                source.via(flow)
+                //.via(another- flow)
+                .to(sink);
+
+
+        // create the akka actor
+        ActorSystem system = ActorSystem.create(Behaviors.empty(), "Simple-Stream");
+
+        // execute the graph in akka actor
+        graph.run(system);
+    }
+}
