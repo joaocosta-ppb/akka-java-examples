@@ -7,10 +7,9 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>1-akka-streams</artifactId>
+    <artifactId>3-simple-flows</artifactId>
     <packaging>jar</packaging>
 
-    <name>1-akka-streams</name>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>

@@ -6,6 +6,7 @@
     <modules>
         <module>1-akka-streams</module>
         <module>2-akka-streams</module>
+        <module>3-simple-flows</module>
     </modules>
 
     <parent>

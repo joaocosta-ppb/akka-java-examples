@@ -19,7 +19,6 @@
         <dependency>
             <groupId>com.typesafe.akka</groupId>
             <artifactId>akka-stream-typed_2.13</artifactId>
-            <version>${akka.version}</version>
         </dependency>
 
         <!-- Required akka -->
