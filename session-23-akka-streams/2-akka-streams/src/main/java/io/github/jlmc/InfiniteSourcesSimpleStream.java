@@ -73,6 +73,7 @@ public class InfiniteSourcesSimpleStream {
                 Sink.foreach(value -> {
                     System.out.println("==> " + value);
                 });
+        Sink<String, CompletionStage<Done>> ignore = Sink.ignore();
 
         // putting all together, to create the graph
 
