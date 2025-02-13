@@ -8,7 +8,7 @@ import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 
-import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 
@@ -31,6 +31,7 @@ public class ExploringFlows {
         Flow<Integer, String, NotUsed> flow =
                 Flow.of(Integer.class)
                         .filter(value -> value % 17 == 0)
+                        .mapConcat(param -> List.of(param, param + 1, param + 2))
                         .map(incomingValue -> "The next value is " + incomingValue) // convert the integer;
         ;
 
