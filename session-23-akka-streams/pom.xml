@@ -8,6 +8,7 @@
         <module>2-akka-streams</module>
         <module>3-simple-flows</module>
         <module>4-simple-exercise-1-big-primes</module>
+        <module>5-materialized-values</module>
     </modules>
 
     <parent>
