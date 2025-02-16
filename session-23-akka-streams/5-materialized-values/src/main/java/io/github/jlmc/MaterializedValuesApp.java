@@ -40,22 +40,26 @@ public class MaterializedValuesApp {
         Sink<Lottery, CompletionStage<Integer>> sinkWithCounter =
                 Sink.fold(0, (count, lottery) -> count + lottery.number());
 
+        // alternatively
 
-        CompletionStage<Integer> result =
+        var s = Sink.reduce((Lottery a, Lottery b) -> a.sum(b));
+
+        CompletionStage<Lottery> result =
                 rangeSource
                         .via(greaterThan200Filter)
                         .via(isNumberEvenFilter)
                         //.runWith(sinkWithCounter, materializer);
-                        .toMat(sinkWithCounter, Keep.right())
+                        //.toMat(sinkWithCounter, Keep.right())
+                        .toMat(s, Keep.right())
                         .run(actorSystem);
 
         //result.toCompletableFuture().get();
 
-        result.whenComplete((integer, throwable) -> {
+        result.whenComplete((resultValue, throwable) -> {
             if (throwable != null) {
                 System.out.println("Error: " + throwable.getMessage());
             } else {
-                System.out.println("Result: " + integer);
+                System.out.println("Result: " + resultValue);
             }
 
             actorSystem.terminate();
@@ -78,6 +82,10 @@ public class MaterializedValuesApp {
     }
 
     record Lottery(int id, int number) {
+
+        Lottery sum(Lottery other) {
+            return new Lottery(other.id + id, other.number + number);
+        }
     }
 
 }
