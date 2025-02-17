@@ -41,7 +41,7 @@ public class AsynchronousBoundariesApp1 {
                 Flow.of(BigInteger.class)
                         .map(number -> {
 
-                           // actorSystem.log().debug("number {} resolving next prime number", number);
+                            // actorSystem.log().debug("number {} resolving next prime number", number);
                             BigInteger nextPrimeNumber = number.nextProbablePrime();
                             actorSystem.log().debug("generated prime number for {} resolved next prime number {}", number, nextPrimeNumber);
 
@@ -56,7 +56,7 @@ public class AsynchronousBoundariesApp1 {
 
                             return list.stream().sorted(Comparator.comparing(NumberNextPrimePair::number)).toList();
                         })
-                        //.mapConcat(i -> i)
+                //.mapConcat(i -> i)
 
                 ;
 
@@ -66,13 +66,12 @@ public class AsynchronousBoundariesApp1 {
 
         var resultCompletedPromise =
                 source.via(numberGenerator)
-                        //.async()
+                        .async() // Asynchronous boundary
                         .via(primeGenerator)
+                        .async() // Asynchronous boundary
                         .via(groupResults)
                         .toMat(printSkin, Keep.right())
                         .run(actorSystem);
-
-
 
 
         resultCompletedPromise.whenComplete((result, throwable) -> {
