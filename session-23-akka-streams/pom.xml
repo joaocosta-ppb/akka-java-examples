@@ -9,6 +9,7 @@
         <module>3-simple-flows</module>
         <module>4-simple-exercise-1-big-primes</module>
         <module>5-materialized-values</module>
+        <module>6-back-pressure-and-graph-performance</module>
     </modules>
 
     <parent>
