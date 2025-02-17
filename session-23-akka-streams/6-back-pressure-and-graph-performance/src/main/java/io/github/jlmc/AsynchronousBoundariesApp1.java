@@ -4,6 +4,8 @@ import akka.Done;
 import akka.NotUsed;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.javadsl.Behaviors;
+import akka.stream.Attributes;
+import akka.stream.OverflowStrategy;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Sink;
@@ -17,6 +19,12 @@ import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * # 1  <br>
+ * - Asynchronous Boundaries
+ * - back pressure
+ * - buffers
+ */
 public class AsynchronousBoundariesApp1 {
 
 
@@ -28,12 +36,13 @@ public class AsynchronousBoundariesApp1 {
 
         ActorSystem<?> actorSystem = ActorSystem.create(Behaviors.empty(), "actorSystem");
 
-        Source<Integer, NotUsed> source = Source.range(1, 10);
+        Source<Integer, NotUsed> source = Source.range(1, 100);
 
         Flow<Integer, BigInteger, NotUsed> numberGenerator = Flow.of(Integer.class)
                 .map(it -> {
                     BigInteger number = new BigInteger(3000, ThreadLocalRandom.current());
-                    actorSystem.log().debug("it <{}> flow input generate the number <{}>", it, number);
+                    //actorSystem.log().debug("it <{}> flow input generate the number <{}>", it, number);
+                    System.out.println("Big Integer: " + number);
                     return number;
                 });
 
@@ -43,7 +52,9 @@ public class AsynchronousBoundariesApp1 {
 
                             // actorSystem.log().debug("number {} resolving next prime number", number);
                             BigInteger nextPrimeNumber = number.nextProbablePrime();
-                            actorSystem.log().debug("generated prime number for {} resolved next prime number {}", number, nextPrimeNumber);
+                            //actorSystem.log().debug("generated prime number for {} resolved next prime number {}", number, nextPrimeNumber);
+
+                            System.out.println("Prime number: " + number + " => " + nextPrimeNumber);
 
                             return new NumberNextPrimePair(number, nextPrimeNumber);
                         });
@@ -67,7 +78,10 @@ public class AsynchronousBoundariesApp1 {
         var resultCompletedPromise =
                 source.via(numberGenerator)
                         .async() // Asynchronous boundary
-                        .via(primeGenerator)
+                        // create a buffer
+                        .buffer(16, OverflowStrategy.backpressure())
+                        //---
+                        .via(primeGenerator.addAttributes(Attributes.inputBuffer(16, 52)))
                         .async() // Asynchronous boundary
                         .via(groupResults)
                         .toMat(printSkin, Keep.right())
