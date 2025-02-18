@@ -3,6 +3,7 @@ package io.github.jlmc;
 import akka.NotUsed;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.javadsl.Behaviors;
+import akka.japi.function.Function;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Sink;
@@ -14,25 +15,26 @@ import io.github.jlmc.services.LocationService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.IntStream;
 
 public class App {
 
 
     public static final String GO = "go";
 
+    private static final List<String> IDS = List.of("1", "2", "3", "4", "5", "6", "7", "8");
+
     public static void main(String[] args) {
 
         final Map<String, VehiclePositionMessage> repository = new HashMap<>();
 
-        for (int i = 0; i < 10; i++) {
-            String id = "%s-%d".formatted(GO, i);
+        for (String id : IDS) {
             repository.put(id, new VehiclePositionMessage(id, Instant.now(), 0, 0));
         }
 
-        final LocationService locationService = new LocationService();
 
         //source - repeat some value every 10 seconds.
         Source<String, NotUsed> source = Source.repeat(GO).throttle(1, Duration.ofSeconds(10));
@@ -40,12 +42,7 @@ public class App {
 
         //flow 1 - transform into the ids of each van (ie 1..8) with mapConcat
         var generateIds = Flow.of(String.class)
-                .mapConcat(v -> {
-
-                    return IntStream.range(1, 9)
-                            .mapToObj(i -> "%s-%d".formatted(v, i))
-                            .toList();
-                });
+                .mapConcat(v -> IDS);
 
 
         //flow 2 - get position for each van as a VPMs with a call to the lookup method (create a new instance of
@@ -53,8 +50,20 @@ public class App {
         Flow<String, VehiclePositionMessage, NotUsed> calculatePositionsWithGPS = Flow.of(String.class)
                 .map(vehicleId -> {
                     System.out.println("Requesting Position for vehicle " + vehicleId);
-
+                    LocationService locationService = new LocationService();
                     return locationService.getVehiclePosition(vehicleId);
+                });
+
+        Flow<String, VehiclePositionMessage, NotUsed> calculatePositionsWithGPSAsync = Flow.of(String.class)
+                .mapAsync(4, new Function<String, CompletionStage<VehiclePositionMessage>>() {
+                    @Override
+                    public CompletionStage<VehiclePositionMessage> apply(String vehicleId) {
+                        return CompletableFuture.supplyAsync(() -> {
+                            System.out.println("Requesting Position for vehicle " + vehicleId);
+                            LocationService locationService = new LocationService();
+                            return locationService.getVehiclePosition(vehicleId);
+                        });
+                    }
                 });
 
 
@@ -64,6 +73,7 @@ public class App {
                 .map(vehiclePositionMessage -> {
                     VehiclePositionMessage previousPositionMessage = repository.get(vehiclePositionMessage.vehicleId());
 
+                    LocationService locationService = new LocationService();
                     VehicleSpeed speed = locationService.calculateSpeed(vehiclePositionMessage, previousPositionMessage);
 
                     System.out.println("Vehicle " + vehiclePositionMessage.vehicleId() + " is travelling at " + speed.speed());
@@ -89,7 +99,7 @@ public class App {
                 .async()
                 .via(generateIds)
                 .async()
-                .via(calculatePositionsWithGPS)
+                .via(calculatePositionsWithGPSAsync)
                 .via(calculateSpeed)
                 .via(speedFilter)
                 .toMat(skin, Keep.right())
@@ -98,6 +108,7 @@ public class App {
         result.whenComplete((value, throwable) -> {
             if (throwable != null) {
                 System.out.println("Something went wrong " + throwable);
+                //noinspection CallToPrintStackTrace
                 throwable.printStackTrace();
             } else {
                 System.out.println("Vehicle " + value.id() + " was going at a speed of " + value.speed());
