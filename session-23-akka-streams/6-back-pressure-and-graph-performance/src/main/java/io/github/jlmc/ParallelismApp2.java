@@ -4,8 +4,7 @@ import akka.Done;
 import akka.NotUsed;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.javadsl.Behaviors;
-import akka.stream.Attributes;
-import akka.stream.OverflowStrategy;
+import akka.japi.function.Function;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Sink;
@@ -16,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -33,7 +33,7 @@ public class ParallelismApp2 {
 
         ActorSystem<?> actorSystem = ActorSystem.create(Behaviors.empty(), "actorSystem");
 
-        Source<Integer, NotUsed> source = Source.range(1, 100);
+        Source<Integer, NotUsed> source = Source.range(1, 10);
 
         Flow<Integer, BigInteger, NotUsed> numberGenerator = Flow.of(Integer.class)
                 .map(it -> {
@@ -56,6 +56,26 @@ public class ParallelismApp2 {
                             return new NumberNextPrimePair(number, nextPrimeNumber);
                         });
 
+        Flow<BigInteger, NumberNextPrimePair, NotUsed> primeGeneratorAsync =
+                Flow.of(BigInteger.class)
+                        .mapAsyncUnordered(4, new Function<BigInteger, CompletionStage<NumberNextPrimePair>>() {
+                            @Override
+                            public CompletionStage<NumberNextPrimePair> apply(BigInteger number) {
+                                // CompletableFuture<NumberNextPrimePair> future = new CompletableFuture<>();
+                                CompletableFuture<NumberNextPrimePair> future = CompletableFuture.supplyAsync(() -> {
+                                    // actorSystem.log().debug("number {} resolving next prime number", number);
+                                    BigInteger nextPrimeNumber = number.nextProbablePrime();
+                                    //actorSystem.log().debug("generated prime number for {} resolved next prime number {}", number, nextPrimeNumber);
+
+                                    System.out.println("Prime number: " + number + " => " + nextPrimeNumber);
+
+                                    return new NumberNextPrimePair(number, nextPrimeNumber);
+                                });
+                                return future;
+                            }
+                        });
+
+
 
         var groupResults =
                 Flow.of(NumberNextPrimePair.class)
@@ -76,9 +96,9 @@ public class ParallelismApp2 {
                 source.via(numberGenerator)
                         .async() // Asynchronous boundary
                         // create a buffer
-                        .buffer(16, OverflowStrategy.backpressure())
+                        //.buffer(16, OverflowStrategy.backpressure())
                         //---
-                        .via(primeGenerator.addAttributes(Attributes.inputBuffer(16, 52)))
+                        .via(primeGeneratorAsync)
                         .async() // Asynchronous boundary
                         .via(groupResults)
                         .toMat(printSkin, Keep.right())
